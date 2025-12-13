@@ -8,10 +8,20 @@ export function check_permission(context, path, operation = 'write') {
     var authAccount = null;
 
     if (headers.get('Authorization')) {
-        const Authorization = headers.get('Authorization').split("Basic ")[1];
-        const account = atob(Authorization);
-        if (context.env[account]) {
-            authAccount = account;
+        const authHeader = headers.get('Authorization');
+        const basicMatch = authHeader.match(/^Basic\s+(.+)$/);
+
+        if (basicMatch) {
+            try {
+                const Authorization = basicMatch[1];
+                const account = atob(Authorization);
+                if (context.env[account]) {
+                    authAccount = account;
+                }
+            } catch (error) {
+                // Base64 解码失败，继续使用游客权限
+                console.error('Base64 decode error:', error.message);
+            }
         }
     }
 
