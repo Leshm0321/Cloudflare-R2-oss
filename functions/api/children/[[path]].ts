@@ -1,10 +1,21 @@
 import { notFound, parseBucketPath } from "@/utils/bucket";
+import { get_read_permission } from "@/utils/auth";
 
 export async function onRequestGet(context) {
   try {
     const [bucket, path] = parseBucketPath(context);
     const prefix = path && `${path}/`;
     if (!bucket || prefix.startsWith("_$flaredrive$/")) return notFound();
+
+    // 检查读取权限
+    if (!get_read_permission(context, prefix || "")) {
+        const headers = new Headers();
+        headers.set("WWW-Authenticate", 'Basic realm="需要登录"');
+        return new Response("需要认证才能查看目录", {
+            status: 401,
+            headers: headers,
+        });
+    }
 
     const objList = await bucket.list({
       prefix,
