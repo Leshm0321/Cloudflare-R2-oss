@@ -430,9 +430,52 @@ export default {
     },
 
     async removeFile(key) {
-      if (!window.confirm(`确定要删除 ${key} 吗？`)) return;
-      await axios.delete(`/api/write/items/${key}`);
-      this.fetchFiles();
+      const displayName = key.endsWith('_$folder$')
+        ? `文件夹 "${key.slice(0, -9)}"`
+        : `文件 "${key}"`;
+
+      const confirmMessage = key.endsWith('_$folder$')
+        ? `确定要删除 ${displayName} 吗？\n⚠️ 这将递归删除文件夹中的所有文件和子文件夹，此操作不可恢复！`
+        : `确定要删除 ${displayName} 吗？`;
+
+      if (!window.confirm(confirmMessage)) return;
+
+      try {
+        // 显示删除进度（对于文件夹）
+        if (key.endsWith('_$folder$')) {
+          this.loading = true;
+          console.log('正在删除文件夹及其所有内容...');
+        }
+
+        const response = await axios.delete(`/api/write/items/${key}`);
+        if (response.status === 204) {
+          // 204 表示删除成功
+          const successMessage = key.endsWith('_$folder$')
+            ? '文件夹及其所有内容删除成功'
+            : '删除成功';
+          console.log(successMessage);
+
+          // 显示成功提示
+          this.showMessage(successMessage, 'success');
+          this.fetchFiles();
+        } else {
+          console.log('删除完成，状态码:', response.status);
+          this.fetchFiles();
+        }
+      } catch (error) {
+        if (error.response?.status === 401) {
+          // 处理认证错误
+          window.location.href = '/api/write/';
+        } else {
+          console.error('删除失败:', error);
+          const errorMessage = key.endsWith('_$folder$')
+            ? '文件夹删除失败，可能包含大量文件或网络问题'
+            : '删除失败，请检查权限或网络连接';
+          alert(errorMessage);
+        }
+      } finally {
+        this.loading = false;
+      }
     },
 
     async renameFile(key) {
@@ -601,6 +644,55 @@ export default {
       this.uploadQueue.push(...uploadTasks);
       setTimeout(() => this.processUploadQueue());
     },
+
+  // 显示消息提示
+  showMessage(message, type = 'info') {
+    // 创建消息元素
+    const messageEl = document.createElement('div');
+    messageEl.className = `message-toast message-${type}`;
+    messageEl.textContent = message;
+
+    // 添加样式
+    messageEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 4px;
+      color: white;
+      z-index: 10000;
+      font-size: 14px;
+      max-width: 300px;
+      animation: slideIn 0.3s ease-out;
+    `;
+
+    // 根据类型设置背景色
+    switch (type) {
+      case 'success':
+        messageEl.style.backgroundColor = '#28a745';
+        break;
+      case 'error':
+        messageEl.style.backgroundColor = '#dc3545';
+        break;
+      case 'warning':
+        messageEl.style.backgroundColor = '#ffc107';
+        messageEl.style.color = '#000';
+        break;
+      default:
+        messageEl.style.backgroundColor = '#007bff';
+    }
+
+    // 添加到页面
+    document.body.appendChild(messageEl);
+
+    // 3秒后自动移除
+    setTimeout(() => {
+      messageEl.style.animation = 'slideOut 0.3s ease-in';
+      setTimeout(() => {
+        document.body.removeChild(messageEl);
+      }, 300);
+    }, 3000);
+  },
   },
 
   watch: {

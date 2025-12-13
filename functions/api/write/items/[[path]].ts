@@ -143,6 +143,52 @@ export async function onRequestDelete(context) {
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
+  // 检查是否是文件夹删除
+  if (path.endsWith('_$folder$')) {
+    const folderPath = path.slice(0, -9); // 移除 '_$folder$' 后缀
+    await deleteFolderRecursively(bucket, folderPath);
+  }
+
+  // 删除指定的文件或文件夹标记
   await bucket.delete(path);
   return new Response(null, { status: 204 });
+}
+
+// 递归删除文件夹及其所有内容
+async function deleteFolderRecursively(bucket, folderPath) {
+  const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/';
+  let hasMore = true;
+  let continuationToken = null;
+
+  while (hasMore) {
+    try {
+      // 列出文件夹中的所有对象
+      const list = await bucket.list({
+        prefix: prefix,
+        continuationToken: continuationToken
+      });
+
+      // 删除所有文件和对象
+      if (list.objects.length > 0) {
+        const deletePromises = list.objects.map(obj => bucket.delete(obj.key));
+        await Promise.all(deletePromises);
+      }
+
+      // 处理子文件夹（以 _$folder$ 结尾的对象）
+      const folderObjects = list.objects.filter(obj => obj.key.endsWith('_$folder$'));
+      if (folderObjects.length > 0) {
+        for (const folderObj of folderObjects) {
+          const subFolderPath = folderObj.key.slice(0, -9); // 移除 '_$folder$'
+          await deleteFolderRecursively(bucket, subFolderPath);
+        }
+      }
+
+      // 检查是否还有更多对象
+      hasMore = !!list.truncated;
+      continuationToken = list.truncated ? list.cursor : null;
+    } catch (error) {
+      console.error('删除文件夹内容时出错:', error);
+      // 继续处理，不要因为单个对象失败而停止
+    }
+  }
 }
