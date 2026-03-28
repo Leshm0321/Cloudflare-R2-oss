@@ -255,7 +255,11 @@ export default {
 
     async authFetch(url, options = {}) {
       const headers = { ...this.getAuthHeaders(), ...options.headers };
-      const response = await fetch(url, { ...options, headers });
+      const response = await fetch(url, { 
+        ...options, 
+        headers,
+        credentials: 'include'  // Ensure cookies/auth are included
+      });
       this.captureAuth(response);
       return response;
     },
@@ -760,6 +764,12 @@ export default {
   },
 
   created() {
+    // Load authHeader from localStorage if available
+    const storedAuth = localStorage.getItem('auth_header');
+    if (storedAuth) {
+      this.authHeader = storedAuth;
+    }
+    
     window.addEventListener("popstate", (ev) => {
       const searchParams = new URL(window.location).searchParams;
       if (searchParams.get("p") !== this.cwd)

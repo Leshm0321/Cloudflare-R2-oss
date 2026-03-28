@@ -63,7 +63,8 @@ export async function multipartUpload(key, file, options) {
   const uploadIdRes = await fetch(`/api/write/items/${key}?uploads`, {
     method: 'POST',
     body: '',
-    headers
+    headers,
+    credentials: 'include'
   });
   const { uploadId } = await uploadIdRes.json();
   
@@ -77,7 +78,8 @@ export async function multipartUpload(key, file, options) {
     const partRes = await fetch(`/api/write/items/${key}?${searchParams}`, {
       method: 'PUT',
       body: chunk,
-      headers: { 'Content-Type': file.type }
+      headers,  // Use full headers including Authorization
+      credentials: 'include'
     });
     
     const etag = partRes.headers.get('etag') || `"${i}"`;
@@ -94,7 +96,8 @@ export async function multipartUpload(key, file, options) {
   const completeParams = new URLSearchParams({ uploadId });
   await fetch(`/api/write/items/${key}?${completeParams}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,  // Use full headers including Authorization
+    credentials: 'include',
     body: JSON.stringify({ parts: uploadedParts })
   });
 }
