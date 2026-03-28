@@ -210,6 +210,7 @@ export default {
     showUploadPopup: false,
     uploadProgress: null,
     uploadQueue: [],
+    authHeader: null,
   }),
 
   computed: {
@@ -238,16 +239,39 @@ export default {
       navigator.clipboard.writeText(url.toString());
     },
 
+    getAuthHeaders() {
+      return this.authHeader ? { 'Authorization': this.authHeader } : {};
+    },
+
+    captureAuth(response) {
+      if (!this.authHeader) {
+        const auth = response.headers.get('Authorization');
+        if (auth) {
+          this.authHeader = auth;
+          localStorage.setItem('auth_header', auth);
+        }
+      }
+    },
+
+    async authFetch(url, options = {}) {
+      const headers = { ...this.getAuthHeaders(), ...options.headers };
+      const response = await fetch(url, { ...options, headers });
+      this.captureAuth(response);
+      return response;
+    },
+
     async copyPaste(source, target) {
       const uploadUrl = `/api/write/items/${target}`;
-      await fetch(uploadUrl, {
+      const res = await this.authFetch(uploadUrl, {
         method: 'PUT',
         body: '',
         headers: { "x-amz-copy-source": encodeURIComponent(source) }
-      }).then(res => {
-        if (res.status === 401) window.location.href = '/api/write/';
-        if (!res.ok) throw new Error('Copy failed');
       });
+      if (res.status === 401) {
+        this.authHeader = null;
+        window.location.href = '/api/write/';
+      }
+      if (!res.ok) throw new Error('Copy failed');
     },
 
     async createFolder() {
@@ -256,13 +280,15 @@ export default {
         if (!folderName) return;
         this.showUploadPopup = false;
         const uploadUrl = `/api/write/items/${this.cwd}${folderName}/_$folder$`;
-        await fetch(uploadUrl, {
+        const res = await this.authFetch(uploadUrl, {
           method: 'PUT',
           body: ''
-        }).then(res => {
-          if (res.status === 401) window.location.href = '/api/write/';
-          if (!res.ok) throw new Error('Create folder failed');
         });
+        if (res.status === 401) {
+          this.authHeader = null;
+          window.location.href = '/api/write/';
+        }
+        if (!res.ok) throw new Error('Create folder failed');
         this.fetchFiles();
       } catch (error) {
         console.log(`Create folder failed`);
@@ -273,9 +299,10 @@ export default {
       this.files = [];
       this.folders = [];
       this.loading = true;
-      fetch(`/api/children/${this.cwd}`)
+      this.authFetch(`/api/children/${this.cwd}`)
         .then((res) => {
           if (res.status === 401) {
+            this.authHeader = null;
             window.location.href = '/api/write/';
             return null;
           }
@@ -378,54 +405,58 @@ export default {
       const { basedir, file } = this.uploadQueue.pop(0);
       let thumbnailDigest = null;
 
-        if (file.type.startsWith("image/") || file.type === "video/mp4") {
-          try {
-            const thumbnailBlob = await generateThumbnail(file);
-            const digestHex = await blobDigest(thumbnailBlob);
+      if (file.type.startsWith("image/") || file.type === "video/mp4") {
+        try {
+          const thumbnailBlob = await generateThumbnail(file);
+          const digestHex = await blobDigest(thumbnailBlob);
 
-            const thumbnailUploadUrl = `/api/write/items/_$flaredrive$/thumbnails/${digestHex}.png`;
-            try {
-              await fetch(thumbnailUploadUrl, {
-                method: 'PUT',
-                body: thumbnailBlob,
-                headers: { 'Content-Type': 'image/png' }
-              }).then(res => {
-                if (res.status === 401) window.location.href = '/api/write/';
-                if (!res.ok) throw new Error('Upload failed');
-              });
-              thumbnailDigest = digestHex;
-            } catch (error) {
-              console.log(`Upload ${digestHex}.png failed`);
+          const thumbnailUploadUrl = `/api/write/items/_$flaredrive$/thumbnails/${digestHex}.png`;
+          try {
+            const res = await this.authFetch(thumbnailUploadUrl, {
+              method: 'PUT',
+              body: thumbnailBlob,
+              headers: { 'Content-Type': 'image/png' }
+            });
+            if (res.status === 401) {
+              this.authHeader = null;
+              window.location.href = '/api/write/';
+              return;
             }
+            if (!res.ok) throw new Error('Upload failed');
+            thumbnailDigest = digestHex;
           } catch (error) {
-            console.log(`Generate thumbnail failed`);
+            console.log(`Upload ${digestHex}.png failed`);
           }
+        } catch (error) {
+          console.log(`Generate thumbnail failed`);
         }
+      }
 
       try {
         const uploadUrl = `/api/write/items/${basedir}${file.name}`;
-        const headers = {};
+        const headers = { ...this.getAuthHeaders() };
         if (thumbnailDigest) headers["fd-thumbnail"] = thumbnailDigest;
+        headers['Content-Type'] = file.type;
         
         if (file.size >= SIZE_LIMIT) {
-          await multipartUpload(`${basedir}${file.name}`, file, {
+          await this.multipartUpload(`${basedir}${file.name}`, file, {
             headers,
             onUploadProgress: (progress) => {
               this.uploadProgress = (progress.loaded / progress.total) * 100;
             },
           });
         } else {
-          await fetch(uploadUrl, {
+          const res = await this.authFetch(uploadUrl, {
             method: 'PUT',
             body: file,
-            headers: {
-              'Content-Type': file.type,
-              ...headers
-            }
-          }).then(res => {
-            if (res.status === 401) window.location.href = '/api/write/';
-            if (!res.ok) throw new Error('Upload failed');
+            headers
           });
+          if (res.status === 401) {
+            this.authHeader = null;
+            window.location.href = '/api/write/';
+            return;
+          }
+          if (!res.ok) throw new Error('Upload failed');
         }
       } catch (error) {
         console.log(`Upload ${file.name} failed`, error);
@@ -445,13 +476,12 @@ export default {
       if (!window.confirm(confirmMessage)) return;
 
       try {
-        // 显示删除进度（对于文件夹）
         if (key.endsWith('_$folder$')) {
           this.loading = true;
           console.log('正在删除文件夹及其所有内容...');
         }
 
-        const response = await fetch(`/api/write/items/${key}`, {
+        const response = await this.authFetch(`/api/write/items/${key}`, {
           method: 'DELETE'
         });
         if (response.status === 204 || response.ok) {
@@ -462,6 +492,7 @@ export default {
           this.showMessage(successMessage, 'success');
           this.fetchFiles();
         } else if (response.status === 401) {
+          this.authHeader = null;
           window.location.href = '/api/write/';
         } else {
           console.log('删除完成，状态码:', response.status);
@@ -482,7 +513,7 @@ export default {
       const newName = window.prompt("重命名为:");
       if (!newName) return;
       await this.copyPaste(key, `${this.cwd}${newName}`);
-      await fetch(`/api/write/items/${key}`, { method: 'DELETE' });
+      await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
       this.fetchFiles();
     },
 
@@ -565,7 +596,7 @@ export default {
               // 复制到新位置
               await this.copyPaste(item.key, newPath);
               // 删除原位置
-              await axios.delete(`/api/write/items/${item.key}`);
+              await this.authFetch(`/api/write/items/${item.key}`, { method: 'DELETE' });
               
               // 更新进度
               processedItems++;
@@ -608,7 +639,12 @@ export default {
           url.searchParams.set('marker', marker);
         }
         
-        const response = await fetch(url);
+        const response = await this.authFetch(url);
+        if (response.status === 401) {
+          this.authHeader = null;
+          window.location.href = '/api/write/';
+          return items;
+        }
         const data = await response.json();
         
         // 添加文件
@@ -658,6 +694,49 @@ export default {
           }
         }, 300);
       }, 3000);
+    },
+
+    async multipartUpload(key, file, options) {
+      const headers = { ...options?.headers };
+      headers["content-type"] = file.type;
+
+      const uploadIdRes = await this.authFetch(`/api/write/items/${key}?uploads`, {
+        method: 'POST',
+        body: '',
+        headers
+      });
+      const { uploadId } = await uploadIdRes.json();
+      
+      const totalChunks = Math.ceil(file.size / 100 / 1000 / 1000);
+      const uploadedParts = [];
+
+      for (let i = 1; i <= totalChunks; i++) {
+        const chunk = file.slice((i - 1) * 100 * 1000 * 1000, i * 100 * 1000 * 1000);
+        const searchParams = new URLSearchParams({ partNumber: i, uploadId });
+        
+        const partRes = await this.authFetch(`/api/write/items/${key}?${searchParams}`, {
+          method: 'PUT',
+          body: chunk,
+          headers: { 'Content-Type': file.type }
+        });
+        
+        const etag = partRes.headers.get('etag') || `"${i}"`;
+        uploadedParts[i - 1] = { partNumber: i, etag };
+
+        if (typeof options?.onUploadProgress === "function") {
+          options.onUploadProgress({
+            loaded: Math.min(i * 100 * 1000 * 1000, file.size),
+            total: file.size,
+          });
+        }
+      }
+
+      const completeParams = new URLSearchParams({ uploadId });
+      await this.authFetch(`/api/write/items/${key}?${completeParams}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parts: uploadedParts })
+      });
     },
   },
 
