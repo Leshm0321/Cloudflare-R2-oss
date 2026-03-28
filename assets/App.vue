@@ -609,7 +609,7 @@ export default {
           // 移动目录标记
           const targetFolderPath = targetBasePath.slice(0, -1) + '_$folder$';
           await this.copyPaste(key, targetFolderPath);
-          await axios.delete(`/api/write/items/${key}`);
+          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
           
           // 清除进度
           this.uploadProgress = null;
@@ -617,7 +617,7 @@ export default {
           // 单文件移动逻辑，修复根目录的情况
           const targetFilePath = normalizedPath + finalFileName;
           await this.copyPaste(key, targetFilePath);
-          await axios.delete(`/api/write/items/${key}`);
+          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
         }
         
         // 刷新文件列表

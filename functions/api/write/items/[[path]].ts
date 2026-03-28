@@ -3,6 +3,20 @@ import {get_auth_status, check_permission} from "@/utils/auth";
 
 const CSRF_HEADER = "x-requested-with";
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, x-requested-with, fd-thumbnail, x-amz-copy-source, cf-connecting-ip, x-forwarded-for",
+  "Access-Control-Max-Age": "86400",
+};
+
+export async function onRequestOptions(context) {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
 const ALLOWED_CONTENT_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -57,6 +71,7 @@ export async function onRequestPostCreateMultipart(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
@@ -104,6 +119,7 @@ export async function onRequestPostCompleteMultipart(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
@@ -134,6 +150,7 @@ export async function onRequestPost(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
@@ -162,6 +179,7 @@ export async function onRequestPutMultipart(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
@@ -202,6 +220,7 @@ export async function onRequestPut(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
@@ -274,6 +293,7 @@ export async function onRequestDelete(context) {
   if (!get_auth_status(context)) {
     const header = new Headers();
     header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    for (const [k, v] of Object.entries(CORS_HEADERS)) header.set(k, v);
     return new Response("Unauthorized", {
       status: 401,
       headers: header,
