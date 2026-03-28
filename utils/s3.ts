@@ -17,6 +17,12 @@ async function hmacSHA256(secret: ArrayBuffer, message: string | ArrayBuffer) {
   return signature;
 }
 
+async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
+  if (typeof data === "string") data = new TextEncoder().encode(data);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return arrayBufferToHex(digest);
+}
+
 export class S3Client {
   accessKeyId: string;
   secretAccessKey: string;
@@ -39,7 +45,12 @@ export class S3Client {
           encodeURIComponent(key) + "=" + encodeURIComponent(value)
       )
       .join("&");
-    const hashedPayload = "UNSIGNED-PAYLOAD";
+
+    const body = init.body || "";
+    const hashedPayload = method === "GET" || method === "HEAD"
+      ? "UNSIGNED-PAYLOAD"
+      : await sha256Hex(body instanceof ArrayBuffer ? body : await new Response(body).arrayBuffer());
+
     const headers = new Headers(init.headers);
     const datetime = new Date().toISOString().replace(/-|:|\.\d+/g, "");
     headers.set("x-amz-date", datetime);

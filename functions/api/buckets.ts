@@ -1,4 +1,5 @@
 import { S3Client } from "@/utils/s3";
+import { get_read_permission } from "@/utils/auth";
 
 async function getCurrentBucket(context) {
   const { request, env } = context;
@@ -45,6 +46,15 @@ export async function onRequestGet(context) {
 
     const url = new URL(request.url);
     if (url.searchParams.has("current")) return await getCurrentBucket(context);
+
+    if (!get_read_permission(context, "")) {
+      const headers = new Headers();
+      headers.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+      return new Response("Authentication required", {
+        status: 401,
+        headers: headers,
+      });
+    }
 
     const client = new S3Client(
       env.AWS_ACCESS_KEY_ID,

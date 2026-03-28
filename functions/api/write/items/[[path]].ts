@@ -1,32 +1,115 @@
 import { notFound, parseBucketPath } from "@/utils/bucket";
-import {get_auth_status} from "@/utils/auth";
+import {get_auth_status, check_permission} from "@/utils/auth";
+
+const CSRF_HEADER = "x-requested-with";
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+const ALLOWED_CONTENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "text/plain",
+  "text/html",
+  "text/css",
+  "text/javascript",
+  "application/javascript",
+  "application/json",
+  "application/xml",
+  "application/zip",
+  "application/x-zip-compressed",
+  "audio/mpeg",
+  "audio/wav",
+  "video/mp4",
+  "video/webm",
+];
+
+function sanitizePath(p: string): string {
+  const decoded = decodeURIComponent(p);
+  const parts = decoded.split('/').filter(part => part && part !== '.');
+  return '/' + parts.join('/');
+}
+
+function validateContentType(contentType: string | null): boolean {
+  if (!contentType) return true;
+  return ALLOWED_CONTENT_TYPES.some(t => contentType.toLowerCase().startsWith(t));
+}
+
+function safeError(message: string): string {
+  if (message.includes("node_modules") || 
+      message.includes("/home/") || 
+      message.includes("\\") ||
+      message.includes("C:") ||
+      message.includes("env.") ||
+      message.match(/\b[A-Z_]+_[A-Z_]+\b/)) {
+    return "Internal server error";
+  }
+  return message.length > 100 ? message.substring(0, 100) + "..." : message;
+}
+
+function checkCSRF(request: Request): boolean {
+  const header = request.headers.get(CSRF_HEADER);
+  return header !== null && header.toLowerCase() === "xmlhttprequest";
+}
 
 export async function onRequestPostCreateMultipart(context) {
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
+    });
+  }
+
+  if (!checkCSRF(context.request)) {
+    return new Response("CSRF validation failed", { status: 403 });
+  }
+
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
   const request: Request = context.request;
+  const contentType = request.headers.get("content-type");
+
+  if (!validateContentType(contentType)) {
+    return new Response("Invalid content type", { status: 400 });
+  }
 
   const customMetadata: Record<string, string> = {};
   if (request.headers.has("fd-thumbnail"))
     customMetadata.thumbnail = request.headers.get("fd-thumbnail");
 
-  const multipartUpload = await bucket.createMultipartUpload(path, {
-    httpMetadata: {
-      contentType: request.headers.get("content-type"),
-    },
-    customMetadata,
-  });
+  try {
+    const multipartUpload = await bucket.createMultipartUpload(path, {
+      httpMetadata: {
+        contentType: contentType,
+      },
+      customMetadata,
+    });
 
-  return new Response(
-    JSON.stringify({
-      key: multipartUpload.key,
-      uploadId: multipartUpload.uploadId,
-    })
-  );
+    return new Response(
+      JSON.stringify({
+        key: multipartUpload.key,
+        uploadId: multipartUpload.uploadId,
+      })
+    );
+  } catch (error: any) {
+    return new Response(safeError(error.message), { status: 500 });
+  }
 }
 
 export async function onRequestPostCompleteMultipart(context) {
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
+    });
+  }
+
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
@@ -43,11 +126,24 @@ export async function onRequestPostCompleteMultipart(context) {
       headers: { etag: object.httpEtag },
     });
   } catch (error: any) {
-    return new Response(error.message, { status: 400 });
+    return new Response(safeError(error.message), { status: 400 });
   }
 }
 
 export async function onRequestPost(context) {
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
+    });
+  }
+
+  if (!checkCSRF(context.request)) {
+    return new Response("CSRF validation failed", { status: 403 });
+  }
+
   const url = new URL(context.request.url);
   const searchParams = new URLSearchParams(url.search);
 
@@ -63,6 +159,15 @@ export async function onRequestPost(context) {
 }
 
 export async function onRequestPutMultipart(context) {
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
+    });
+  }
+
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
@@ -75,28 +180,38 @@ export async function onRequestPutMultipart(context) {
   const partNumber = parseInt(
     new URLSearchParams(url.search).get("partNumber")
   );
-  const uploadedPart = await multipartUpload.uploadPart(
-    partNumber,
-    request.body
-  );
+  
+  try {
+    const uploadedPart = await multipartUpload.uploadPart(
+      partNumber,
+      request.body
+    );
 
-  return new Response(null, {
-    headers: {
-      "Content-Type": "application/json",
-      etag: uploadedPart.etag,
-    },
-  });
+    return new Response(null, {
+      headers: {
+        "Content-Type": "application/json",
+        etag: uploadedPart.etag,
+      },
+    });
+  } catch (error: any) {
+    return new Response(safeError(error.message), { status: 500 });
+  }
 }
 
 export async function onRequestPut(context) {
-  if(!get_auth_status(context)){
-    var header = new Headers()
-    header.set("WWW-Authenticate",'Basic realm="需要登录"')
-    return new Response("没有操作权限", {
-        status: 401,
-        headers: header,
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
     });
-   }
+  }
+
+  if (!checkCSRF(context.request)) {
+    return new Response("CSRF validation failed", { status: 403 });
+  }
+
   const url = new URL(context.request.url);
 
   if (new URLSearchParams(url.search).has("uploadId")) {
@@ -106,7 +221,20 @@ export async function onRequestPut(context) {
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
+  if (!check_permission(context, path, "write")) {
+    return new Response("Access denied", { status: 403 });
+  }
+
   const request: Request = context.request;
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
+    return new Response("File too large", { status: 413 });
+  }
+
+  const contentType = request.headers.get("content-type");
+  if (!validateContentType(contentType)) {
+    return new Response("Invalid content type", { status: 400 });
+  }
 
   let content = request.body;
   const customMetadata: Record<string, string> = {};
@@ -115,7 +243,14 @@ export async function onRequestPut(context) {
     const sourceName = decodeURIComponent(
       request.headers.get("x-amz-copy-source")
     );
+    const normalizedSource = sanitizePath(sourceName);
+    if (!check_permission(context, normalizedSource, "read")) {
+      return new Response("Access to copy source denied", { status: 403 });
+    }
     const source = await bucket.get(sourceName);
+    if (!source) {
+      return new Response("Copy source not found", { status: 404 });
+    }
     content = source.body;
     if (source.customMetadata.thumbnail)
       customMetadata.thumbnail = source.customMetadata.thumbnail;
@@ -124,71 +259,85 @@ export async function onRequestPut(context) {
   if (request.headers.has("fd-thumbnail"))
     customMetadata.thumbnail = request.headers.get("fd-thumbnail");
 
-  const obj = await bucket.put(path, content, { customMetadata });
-  const { key, size, uploaded } = obj;
-  return new Response(JSON.stringify({ key, size, uploaded }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  try {
+    const obj = await bucket.put(path, content, { customMetadata });
+    const { key, size, uploaded } = obj;
+    return new Response(JSON.stringify({ key, size, uploaded }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error: any) {
+    return new Response(safeError(error.message), { status: 500 });
+  }
 }
 
 export async function onRequestDelete(context) {
-  if(!get_auth_status(context)){
-    var header = new Headers()
-    header.set("WWW-Authenticate",'Basic realm="需要登录"')
-    return new Response("没有操作权限", {
-        status: 401,
-        headers: header,
+  if (!get_auth_status(context)) {
+    const header = new Headers();
+    header.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: header,
     });
-   }
+  }
+
+  if (!checkCSRF(context.request)) {
+    return new Response("CSRF validation failed", { status: 403 });
+  }
+
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
 
-  // 检查是否是文件夹删除
-  if (path.endsWith('_$folder$')) {
-    const folderPath = path.slice(0, -9); // 移除 '_$folder$' 后缀
-    await deleteFolderRecursively(bucket, folderPath);
+  if (!check_permission(context, path, "write")) {
+    return new Response("Access denied", { status: 403 });
   }
 
-  // 删除指定的文件或文件夹标记
-  await bucket.delete(path);
-  return new Response(null, { status: 204 });
+  try {
+    if (path.endsWith('_$folder$')) {
+      const folderPath = path.slice(0, -9);
+      await deleteFolderRecursively(context, bucket, folderPath);
+    }
+
+    await bucket.delete(path);
+    return new Response(null, { status: 204 });
+  } catch (error: any) {
+    return new Response(safeError(error.message), { status: 500 });
+  }
 }
 
-// 递归删除文件夹及其所有内容
-async function deleteFolderRecursively(bucket, folderPath) {
+async function deleteFolderRecursively(context, bucket, folderPath) {
   const prefix = folderPath.endsWith('/') ? folderPath : folderPath + '/';
   let hasMore = true;
   let continuationToken = null;
 
   while (hasMore) {
     try {
-      // 列出文件夹中的所有对象
       const list = await bucket.list({
         prefix: prefix,
         continuationToken: continuationToken
       });
 
-      // 删除所有文件和对象
       if (list.objects.length > 0) {
+        for (const obj of list.objects) {
+          if (!check_permission(context, obj.key, "write")) {
+            throw new Error("Access denied to: " + obj.key);
+          }
+        }
         const deletePromises = list.objects.map(obj => bucket.delete(obj.key));
         await Promise.all(deletePromises);
       }
 
-      // 处理子文件夹（以 _$folder$ 结尾的对象）
       const folderObjects = list.objects.filter(obj => obj.key.endsWith('_$folder$'));
       if (folderObjects.length > 0) {
         for (const folderObj of folderObjects) {
-          const subFolderPath = folderObj.key.slice(0, -9); // 移除 '_$folder$'
-          await deleteFolderRecursively(bucket, subFolderPath);
+          const subFolderPath = folderObj.key.slice(0, -9);
+          await deleteFolderRecursively(context, bucket, subFolderPath);
         }
       }
 
-      // 检查是否还有更多对象
       hasMore = !!list.truncated;
       continuationToken = list.truncated ? list.cursor : null;
     } catch (error) {
-      console.error('删除文件夹内容时出错:', error);
-      // 继续处理，不要因为单个对象失败而停止
+      throw error;
     }
   }
 }

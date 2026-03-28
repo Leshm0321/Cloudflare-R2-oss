@@ -1,17 +1,28 @@
 import { notFound, parseBucketPath } from "@/utils/bucket";
 import { get_read_permission } from "@/utils/auth";
 
+function safeError(message: string): string {
+  if (message.includes("node_modules") || 
+      message.includes("/home/") || 
+      message.includes("\\") ||
+      message.includes("C:") ||
+      message.includes("env.") ||
+      message.match(/\b[A-Z_]+_[A-Z_]+\b/)) {
+    return "Internal server error";
+  }
+  return message.length > 100 ? message.substring(0, 100) + "..." : message;
+}
+
 export async function onRequestGet(context) {
   try {
     const [bucket, path] = parseBucketPath(context);
     const prefix = path && `${path}/`;
     if (!bucket || prefix.startsWith("_$flaredrive$/")) return notFound();
 
-    // 检查读取权限
     if (!get_read_permission(context, prefix || "")) {
         const headers = new Headers();
-        headers.set("WWW-Authenticate", 'Basic realm="需要登录"');
-        return new Response("需要认证才能查看目录", {
+        headers.set("WWW-Authenticate", 'Basic realm="Unauthorized"');
+        return new Response("Authentication required", {
             status: 401,
             headers: headers,
         });
@@ -36,7 +47,7 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ value: objKeys, folders }), {
       headers: { "Content-Type": "application/json" },
     });
-  } catch (e) {
-    return new Response(e.toString(), { status: 500 });
+  } catch (e: any) {
+    return new Response(safeError(e.message), { status: 500 });
   }
 }
