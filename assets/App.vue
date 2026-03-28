@@ -288,8 +288,16 @@ export default {
       this.folders = [];
       this.loading = true;
       fetch(`/api/children/${this.cwd}`)
-        .then((res) => res.json())
+        .then((res) => {
+          if (res.status === 401) {
+            window.location.href = '/api/write/';
+            return null;
+          }
+          if (!res.ok) throw new Error('Failed to fetch files');
+          return res.json();
+        })
         .then((files) => {
+          if (!files) return;
           this.files = files.value;
           if (this.order) {
             this.files.sort((a, b) => {
@@ -299,6 +307,10 @@ export default {
             });
           }
           this.folders = files.folders;
+          this.loading = false;
+        })
+        .catch((error) => {
+          console.error('Fetch files error:', error);
           this.loading = false;
         });
     },
@@ -645,54 +657,20 @@ export default {
       setTimeout(() => this.processUploadQueue());
     },
 
-  // 显示消息提示
-  showMessage(message, type = 'info') {
-    // 创建消息元素
-    const messageEl = document.createElement('div');
-    messageEl.className = `message-toast message-${type}`;
-    messageEl.textContent = message;
-
-    // 添加样式
-    messageEl.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 12px 20px;
-      border-radius: 4px;
-      color: white;
-      z-index: 10000;
-      font-size: 14px;
-      max-width: 300px;
-      animation: slideIn 0.3s ease-out;
-    `;
-
-    // 根据类型设置背景色
-    switch (type) {
-      case 'success':
-        messageEl.style.backgroundColor = '#28a745';
-        break;
-      case 'error':
-        messageEl.style.backgroundColor = '#dc3545';
-        break;
-      case 'warning':
-        messageEl.style.backgroundColor = '#ffc107';
-        messageEl.style.color = '#000';
-        break;
-      default:
-        messageEl.style.backgroundColor = '#007bff';
-    }
-
-    // 添加到页面
-    document.body.appendChild(messageEl);
-
-    // 3秒后自动移除
-    setTimeout(() => {
-      messageEl.style.animation = 'slideOut 0.3s ease-in';
+    showMessage(message, type = 'info') {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message-toast message-${type}`;
+      messageEl.textContent = message;
+      document.body.appendChild(messageEl);
       setTimeout(() => {
-        document.body.removeChild(messageEl);
-      }, 300);
-    }, 3000);
-  },
+        messageEl.style.animation = 'slideOutRight 0.3s ease-in forwards';
+        setTimeout(() => {
+          if (messageEl.parentNode) {
+            document.body.removeChild(messageEl);
+          }
+        }, 300);
+      }, 3000);
+    },
   },
 
   watch: {
@@ -738,29 +716,42 @@ export default {
 
 .app-bar {
   position: sticky;
-  top: 0;
-  padding: 8px;
-  background-color: white;
+  top: var(--space-sm);
+  margin: var(--space-sm) var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
   display: flex;
+  gap: var(--space-md);
+  z-index: 100;
 }
 
 .menu-button {
   display: flex;
   position: relative;
-  margin-left: 4px;
+  margin-left: var(--space-xs);
 }
 
 .menu-button > button {
-  transition: background-color 0.2s ease;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
 }
 
 .menu-button > button:hover {
-  background-color: whitesmoke;
+  background-color: var(--bg-hover);
 }
 
 .menu {
   position: absolute;
-  top: 100%;
+  top: calc(100% + var(--space-sm));
   right: 0;
 }
 </style>
