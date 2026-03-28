@@ -24,6 +24,7 @@ function getFileCategory(contentType) {
   if (type.startsWith('audio/')) return 'audio';
   if (type === 'application/pdf') return 'pdf';
   if (['application/zip', 'application/x-zip-compressed', 'application/gzip', 'application/x-rar', 'application/vnd.rar', 'application/x-7z-compressed'].includes(type)) return 'archive';
+  if (type.includes('markdown') || type === 'text/markdown' || type === 'text/x-markdown') return 'markdown';
   if (type.startsWith('text/')) return 'text';
   if (['application/javascript', 'application/json', 'application/xml', 'application/xhtml+xml'].includes(type)) return 'code';
   if (['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(type)) return 'word';
@@ -107,6 +108,14 @@ function getFileCategory(contentType) {
         <rect fill="#ECEFF1" x="14" y="24" width="16" height="2"/>
         <rect fill="#ECEFF1" x="14" y="30" width="18" height="2"/>
         <rect fill="#ECEFF1" x="14" y="36" width="12" height="2"/>
+      </template>
+
+      <!-- Markdown File Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'markdown'">
+        <path fill="#0277BD" d="M38 4H14c-2.2 0-4 1.8-4 4v32c0 2.2 1.8 4 4 4h28c2.2 0 4-1.8 4-4V12L38 4z"/>
+        <path fill="#03A9F4" d="M38 4v8h8l-8-8z"/>
+        <path fill="#FFF" d="M14 14h20v3H14zM14 22h12v2.5H14zM14 28h16v2.5H14zM14 34h8v2.5h-8z"/>
+        <path fill="#81D4FA" d="M28 31l6 8h-4l-4-6-2 2.5v3.5h-4v-10h4v4l2-2z"/>
       </template>
 
       <!-- Code File Icon -->
@@ -209,5 +218,9 @@ function getFileCategory(contentType) {
 
 .icon-archive svg {
   filter: drop-shadow(0 1px 2px rgba(255,167,38,0.4));
+}
+
+.icon-markdown svg {
+  filter: drop-shadow(0 1px 2px rgba(2,119,189,0.4));
 }
 </style>

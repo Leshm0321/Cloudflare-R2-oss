@@ -240,8 +240,13 @@ export default {
 
     async copyPaste(source, target) {
       const uploadUrl = `/api/write/items/${target}`;
-      await axios.put(uploadUrl, "", {
-        headers: { "x-amz-copy-source": encodeURIComponent(source) },
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        body: '',
+        headers: { "x-amz-copy-source": encodeURIComponent(source) }
+      }).then(res => {
+        if (res.status === 401) window.location.href = '/api/write/';
+        if (!res.ok) throw new Error('Copy failed');
       });
     },
 
@@ -251,14 +256,15 @@ export default {
         if (!folderName) return;
         this.showUploadPopup = false;
         const uploadUrl = `/api/write/items/${this.cwd}${folderName}/_$folder$`;
-        await axios.put(uploadUrl, "");
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          body: ''
+        }).then(res => {
+          if (res.status === 401) window.location.href = '/api/write/';
+          if (!res.ok) throw new Error('Create folder failed');
+        });
         this.fetchFiles();
       } catch (error) {
-        fetch("/api/write/")
-          .then((value) => {
-            if (value.redirected) window.location.href = value.url;
-          })
-          .catch(() => {});
         console.log(`Create folder failed`);
       }
     },
@@ -284,6 +290,7 @@ export default {
               if (this.order === "size") {
                 return b.size - a.size;
               }
+              return a.key.localeCompare(b.key);
             });
           }
           this.folders = files.folders;
@@ -371,51 +378,56 @@ export default {
       const { basedir, file } = this.uploadQueue.pop(0);
       let thumbnailDigest = null;
 
-      if (file.type.startsWith("image/") || file.type === "video/mp4") {
-        try {
-          const thumbnailBlob = await generateThumbnail(file);
-          const digestHex = await blobDigest(thumbnailBlob);
-
-          const thumbnailUploadUrl = `/api/write/items/_$flaredrive$/thumbnails/${digestHex}.png`;
+        if (file.type.startsWith("image/") || file.type === "video/mp4") {
           try {
-            await axios.put(thumbnailUploadUrl, thumbnailBlob);
-            thumbnailDigest = digestHex;
+            const thumbnailBlob = await generateThumbnail(file);
+            const digestHex = await blobDigest(thumbnailBlob);
+
+            const thumbnailUploadUrl = `/api/write/items/_$flaredrive$/thumbnails/${digestHex}.png`;
+            try {
+              await fetch(thumbnailUploadUrl, {
+                method: 'PUT',
+                body: thumbnailBlob,
+                headers: { 'Content-Type': 'image/png' }
+              }).then(res => {
+                if (res.status === 401) window.location.href = '/api/write/';
+                if (!res.ok) throw new Error('Upload failed');
+              });
+              thumbnailDigest = digestHex;
+            } catch (error) {
+              console.log(`Upload ${digestHex}.png failed`);
+            }
           } catch (error) {
-            fetch("/api/write/")
-              .then((value) => {
-                if (value.redirected) window.location.href = value.url;
-              })
-              .catch(() => {});
-            console.log(`Upload ${digestHex}.png failed`);
+            console.log(`Generate thumbnail failed`);
           }
-        } catch (error) {
-          console.log(`Generate thumbnail failed`);
         }
-      }
 
       try {
         const uploadUrl = `/api/write/items/${basedir}${file.name}`;
         const headers = {};
-        const onUploadProgress = (progressEvent) => {
-          var percentCompleted =
-            (progressEvent.loaded * 100) / progressEvent.total;
-          this.uploadProgress = percentCompleted;
-        };
         if (thumbnailDigest) headers["fd-thumbnail"] = thumbnailDigest;
+        
         if (file.size >= SIZE_LIMIT) {
           await multipartUpload(`${basedir}${file.name}`, file, {
             headers,
-            onUploadProgress,
+            onUploadProgress: (progress) => {
+              this.uploadProgress = (progress.loaded / progress.total) * 100;
+            },
           });
         } else {
-          await axios.put(uploadUrl, file, { headers, onUploadProgress });
+          await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type,
+              ...headers
+            }
+          }).then(res => {
+            if (res.status === 401) window.location.href = '/api/write/';
+            if (!res.ok) throw new Error('Upload failed');
+          });
         }
       } catch (error) {
-        fetch("/api/write/")
-          .then((value) => {
-            if (value.redirected) window.location.href = value.url;
-          })
-          .catch(() => {});
         console.log(`Upload ${file.name} failed`, error);
       }
       setTimeout(this.processUploadQueue);
@@ -439,32 +451,28 @@ export default {
           console.log('正在删除文件夹及其所有内容...');
         }
 
-        const response = await axios.delete(`/api/write/items/${key}`);
-        if (response.status === 204) {
-          // 204 表示删除成功
+        const response = await fetch(`/api/write/items/${key}`, {
+          method: 'DELETE'
+        });
+        if (response.status === 204 || response.ok) {
           const successMessage = key.endsWith('_$folder$')
             ? '文件夹及其所有内容删除成功'
             : '删除成功';
           console.log(successMessage);
-
-          // 显示成功提示
           this.showMessage(successMessage, 'success');
           this.fetchFiles();
+        } else if (response.status === 401) {
+          window.location.href = '/api/write/';
         } else {
           console.log('删除完成，状态码:', response.status);
           this.fetchFiles();
         }
       } catch (error) {
-        if (error.response?.status === 401) {
-          // 处理认证错误
-          window.location.href = '/api/write/';
-        } else {
-          console.error('删除失败:', error);
-          const errorMessage = key.endsWith('_$folder$')
-            ? '文件夹删除失败，可能包含大量文件或网络问题'
-            : '删除失败，请检查权限或网络连接';
-          alert(errorMessage);
-        }
+        console.error('删除失败:', error);
+        const errorMessage = key.endsWith('_$folder$')
+          ? '文件夹删除失败，可能包含大量文件或网络问题'
+          : '删除失败，请检查权限或网络连接';
+        alert(errorMessage);
       } finally {
         this.loading = false;
       }
@@ -474,7 +482,7 @@ export default {
       const newName = window.prompt("重命名为:");
       if (!newName) return;
       await this.copyPaste(key, `${this.cwd}${newName}`);
-      await axios.delete(`/api/write/items/${key}`);
+      await fetch(`/api/write/items/${key}`, { method: 'DELETE' });
       this.fetchFiles();
     },
 

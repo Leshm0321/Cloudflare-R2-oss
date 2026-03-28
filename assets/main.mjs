@@ -2,45 +2,42 @@ const THUMBNAIL_SIZE = 144;
 
 export function sanitizeFilename(filename) {
   return filename
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[<>:"/\\|?*]/g, '_')
     .replace(/\.\./g, '_')
     .replace(/^[.]/, '_')
     .substring(0, 255);
 }
 
-/**
- * @param {File} file
- */
 export async function generateThumbnail(file) {
   const canvas = document.createElement("canvas");
   canvas.width = THUMBNAIL_SIZE;
   canvas.height = THUMBNAIL_SIZE;
-  var ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
 
-  /** @type HTMLImageElement */
   if (file.type.startsWith("image/")) {
-    const image = await new Promise((resolve) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.src = URL.createObjectURL(file);
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
     });
     ctx.drawImage(image, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
   } else if (file.type === "video/mp4") {
-    // Generate thumbnail from video
-    const video = await new Promise(async (resolve, reject) => {
-      const video = document.createElement("video");
-      video.muted = true;
-      video.src = URL.createObjectURL(file);
+    const video = await new Promise((resolve, reject) => {
+      const vid = document.createElement("video");
+      vid.muted = true;
+      vid.src = URL.createObjectURL(file);
+      vid.onloadedmetadata = () => {
+        vid.currentTime = Math.min(1, vid.duration);
+      };
+      vid.onseeked = () => resolve(vid);
+      vid.onerror = reject;
       setTimeout(() => reject(new Error("Video load timeout")), 2000);
-      await video.play();
-      await video.pause();
-      video.currentTime = 0;
-      resolve(video);
+      vid.play().then(() => vid.pause()).catch(reject);
     });
     ctx.drawImage(video, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
   }
 
-  /** @type Blob */
   const thumbnailBlob = await new Promise((resolve) =>
     canvas.toBlob((blob) => resolve(blob))
   );
@@ -48,9 +45,6 @@ export async function generateThumbnail(file) {
   return thumbnailBlob;
 }
 
-/**
- * @param {Blob} blob
- */
 export async function blobDigest(blob) {
   const digest = await crypto.subtle.digest("SHA-1", await blob.arrayBuffer());
   const digestArray = Array.from(new Uint8Array(digest));
@@ -62,48 +56,45 @@ export async function blobDigest(blob) {
 
 export const SIZE_LIMIT = 100 * 1000 * 1000; // 100MB
 
-/**
- * @param {string} key
- * @param {File} file
- * @param {Record<string, any>} options
- */
 export async function multipartUpload(key, file, options) {
-  const headers = options?.headers || {};
+  const headers = { ...options?.headers };
   headers["content-type"] = file.type;
 
-  const uploadId = await axios
-    .post(`/api/write/items/${key}?uploads`, "", { headers })
-    .then((res) => res.data.uploadId);
+  const uploadIdRes = await fetch(`/api/write/items/${key}?uploads`, {
+    method: 'POST',
+    body: '',
+    headers
+  });
+  const { uploadId } = await uploadIdRes.json();
+  
   const totalChunks = Math.ceil(file.size / SIZE_LIMIT);
-
-  const promiseGenerator = function* () {
-    for (let i = 1; i <= totalChunks; i++) {
-      const chunk = file.slice((i - 1) * SIZE_LIMIT, i * SIZE_LIMIT);
-      const searchParams = new URLSearchParams({ partNumber: i, uploadId });
-      yield axios
-        .put(`/api/write/items/${key}?${searchParams}`, chunk, {
-          onUploadProgress(progressEvent) {
-            if (typeof options?.onUploadProgress !== "function") return;
-            options.onUploadProgress({
-              loaded: (i - 1) * SIZE_LIMIT + progressEvent.loaded,
-              total: file.size,
-            });
-          },
-        })
-        .then((res) => ({
-          partNumber: i,
-          etag: res.headers.etag,
-        }));
-    }
-  };
-
   const uploadedParts = [];
-  for (const part of promiseGenerator()) {
-    const { partNumber, etag } = await part;
-    uploadedParts[partNumber - 1] = { partNumber, etag };
+
+  for (let i = 1; i <= totalChunks; i++) {
+    const chunk = file.slice((i - 1) * SIZE_LIMIT, i * SIZE_LIMIT);
+    const searchParams = new URLSearchParams({ partNumber: i, uploadId });
+    
+    const partRes = await fetch(`/api/write/items/${key}?${searchParams}`, {
+      method: 'PUT',
+      body: chunk,
+      headers: { 'Content-Type': file.type }
+    });
+    
+    const etag = partRes.headers.get('etag') || `"${i}"`;
+    uploadedParts[i - 1] = { partNumber: i, etag };
+
+    if (typeof options?.onUploadProgress === "function") {
+      options.onUploadProgress({
+        loaded: Math.min(i * SIZE_LIMIT, file.size),
+        total: file.size,
+      });
+    }
   }
+
   const completeParams = new URLSearchParams({ uploadId });
-  await axios.post(`/api/write/items/${key}?${completeParams}`, {
-    parts: uploadedParts,
+  await fetch(`/api/write/items/${key}?${completeParams}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parts: uploadedParts })
   });
 }
