@@ -46,89 +46,69 @@
       </div>
     </div>
     <ul class="file-list">
-      <li v-if="cwd !== ''">
+      <li v-if="cwd !== ''" class="parent-dir-item">
         <div
           tabindex="0"
-          class="file-item"
+          class="file-item parent-dir"
           @click="cwd = cwd.replace(/[^\/]+\/$/, '')"
           @contextmenu.prevent
         >
-          <div class="file-icon">
-            <img
-              src="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/4.0.0/png/file/folder/materialicons/36dp/2x/baseline_folder_black_36dp.png"
-              width="36"
-              height="36"
-              alt="Folder"
-            />
+          <div class="file-icon folder-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 4L4 12h3v8h10v-8h3L12 4z"/>
+              <path d="M12 2a10 10 0 0 0-10 10v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8a10 10 0 0 0-10-10z"/>
+            </svg>
           </div>
           <span class="file-name">..</span>
+          <span class="file-hint">返回上级目录</span>
         </div>
       </li>
       <li v-for="folder in filteredFolders" :key="folder">
         <div
           tabindex="0"
-          class="file-item"
+          class="file-item folder-item"
           @click="cwd = folder"
           @contextmenu.prevent="
             showContextMenu = true;
             focusedItem = folder;
           "
         >
-          <div class="file-icon">
-            <img
-              src="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/4.0.0/png/file/folder/materialicons/36dp/2x/baseline_folder_black_36dp.png"
-              width="36"
-              height="36"
-              alt="Folder"
-            />
+          <div class="file-icon folder-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            </svg>
           </div>
-          <span
-            class="file-name"
-            v-text="folder.match(/.*?([^/]*)\/?$/)[1]"
-          ></span>
-          <div style="margin-right: 10px;margin-left: auto;"
-            @click.stop="
-              showContextMenu = true;
-              focusedItem = folder;
-            "
-            >
-              <svg viewBox="0 0 24 24" style="height: 30px; width: 30px;"><path fill="currentColor" d="M10.5,12A1.5,1.5 0 0,1 12,10.5A1.5,1.5 0 0,1 13.5,12A1.5,1.5 0 0,1 12,13.5A1.5,1.5 0 0,1 10.5,12M10.5,16.5A1.5,1.5 0 0,1 12,15A1.5,1.5 0 0,1 13.5,16.5A1.5,1.5 0 0,1 12,18A1.5,1.5 0 0,1 10.5,16.5M10.5,7.5A1.5,1.5 0 0,1 12,6A1.5,1.5 0 0,1 13.5,7.5A1.5,1.5 0 0,1 12,9A1.5,1.5 0 0,1 10.5,7.5M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"></path></svg>
-          </div>
+          <span class="file-name" v-text="folder.match(/.*?([^/]*)\/?$/)[1]"></span>
+          <button class="more-btn" @click.stop="showContextMenu = true; focusedItem = folder;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </button>
         </div>
       </li>
       <li v-for="file in filteredFiles" :key="file.key">
         <div
+          class="file-item file-item-row"
           @click="preview(`/raw/${file.key}`)"
-          @contextmenu.prevent="
-            showContextMenu = true;
-            focusedItem = file;
-          "
+          @contextmenu.prevent="showContextMenu = true; focusedItem = file;"
         >
-          <div class="file-item">
-            <MimeIcon
-              :content-type="file.httpMetadata.contentType"
-              :thumbnail="
-                file.customMetadata.thumbnail
-                  ? `/raw/_$flaredrive$/thumbnails/${file.customMetadata.thumbnail}.png`
-                  : null
-              "
-            />
-            <div>
-              <div class="file-name" v-text="file.key.split('/').pop()"></div>
-              <div class="file-attr">
-                <span v-text="new Date(file.uploaded).toLocaleString()"></span>
-                <span v-text="formatSize(file.size)"></span>
-              </div>
-            </div>
-            <div style="margin-right: 10px;margin-left: auto;"
-            @click.stop="
-              showContextMenu = true;
-              focusedItem = file;
-            "
-            >
-              <svg viewBox="0 0 24 24" style="height: 30px; width: 30px;"><path fill="currentColor" d="M10.5,12A1.5,1.5 0 0,1 12,10.5A1.5,1.5 0 0,1 13.5,12A1.5,1.5 0 0,1 12,13.5A1.5,1.5 0 0,1 10.5,12M10.5,16.5A1.5,1.5 0 0,1 12,15A1.5,1.5 0 0,1 13.5,16.5A1.5,1.5 0 0,1 12,18A1.5,1.5 0 0,1 10.5,16.5M10.5,7.5A1.5,1.5 0 0,1 12,6A1.5,1.5 0 0,1 13.5,7.5A1.5,1.5 0 0,1 12,9A1.5,1.5 0 0,1 10.5,7.5M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"></path></svg>
-            </div>
+          <MimeIcon
+            :content-type="file.httpMetadata.contentType"
+            :thumbnail="file.customMetadata.thumbnail ? `/raw/_$flaredrive$/thumbnails/${file.customMetadata.thumbnail}.png` : null"
+          />
+          <div class="file-info">
+            <span class="file-name" v-text="file.key.split('/').pop()"></span>
+            <span class="file-meta">
+              <span v-text="new Date(file.uploaded).toLocaleString()"></span>
+              <span class="separator">•</span>
+              <span v-text="formatSize(file.size)"></span>
+            </span>
           </div>
+          <button class="more-btn" @click.stop="showContextMenu = true; focusedItem = file;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </button>
         </div>
       </li>
     </ul>

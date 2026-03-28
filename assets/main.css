@@ -173,57 +173,134 @@ ul {
 }
 
 /* ==========================================================================
-   File List
+   File List - Single Column Layout (Windows Style)
    ========================================================================== */
 .file-list {
-  display: flex;
-  flex-wrap: wrap;
-  padding: var(--space-sm);
-  gap: var(--space-sm);
+  display: block;
+  padding: var(--space-sm) var(--space-lg);
 }
 
 .file-list > li {
-  width: 33.33%;
+  width: 100%;
+  display: block;
 }
 
 @media only screen and (max-width: 768px) {
-  .file-list > li {
-    width: 100%;
+  .file-list {
+    padding: var(--space-sm);
   }
 }
 
 /* ==========================================================================
-   File Item - Enhanced with Glassmorphism
+   File Item - Windows Style Single Column
    ========================================================================== */
 .file-item {
-  height: 64px;
-  padding: var(--space-sm) var(--space-md);
+  height: 48px;
+  padding: var(--space-xs) var(--space-md);
   transition: all var(--transition-base);
   display: flex;
   align-items: center;
   cursor: pointer;
   user-select: none;
-  border-radius: var(--radius-lg);
-  margin: var(--space-xs);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+  gap: var(--space-md);
 }
 
 .file-item:hover {
   background-color: var(--bg-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
 }
 
 .file-item:focus {
   outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-.file-item > div {
+.file-item .file-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.file-item .file-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-item .file-info {
+  flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-item .file-info .file-name {
+  flex: none;
+  font-weight: 500;
+}
+
+.file-meta {
+  display: flex;
   align-items: center;
-  gap: var(--space-md);
-  flex: 1;
+  gap: var(--space-sm);
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.file-meta .separator {
+  color: var(--border-color);
+}
+
+.file-hint {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-left: auto;
+  padding-right: var(--space-md);
+}
+
+.parent-dir {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+}
+
+.parent-dir:hover {
+  background: var(--bg-hover);
+  border-style: solid;
+}
+
+.parent-dir .file-icon {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.more-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: all var(--transition-fast);
+  color: var(--text-muted);
+}
+
+.file-item:hover .more-btn {
+  opacity: 1;
+}
+
+.more-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.more-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* ==========================================================================

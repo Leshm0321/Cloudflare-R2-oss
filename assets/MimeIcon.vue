@@ -10,9 +10,31 @@ defineProps({
   },
   size: {
     type: Number,
-    default: 36,
+    default: 32,
   },
 });
+
+function getFileCategory(contentType) {
+  if (!contentType) return 'file';
+  
+  const type = contentType.toLowerCase();
+  
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('video/')) return 'video';
+  if (type.startsWith('audio/')) return 'audio';
+  if (type === 'application/pdf') return 'pdf';
+  if (['application/zip', 'application/x-zip-compressed', 'application/gzip', 'application/x-rar', 'application/vnd.rar', 'application/x-7z-compressed'].includes(type)) return 'archive';
+  if (type.startsWith('text/')) return 'text';
+  if (['application/javascript', 'application/json', 'application/xml', 'application/xhtml+xml'].includes(type)) return 'code';
+  if (['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(type)) return 'word';
+  if (['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(type)) return 'excel';
+  if (['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(type)) return 'ppt';
+  if (type.includes('spreadsheet') || type.includes('excel')) return 'excel';
+  if (type.includes('document') || type.includes('word')) return 'word';
+  if (type.includes('presentation') || type.includes('powerpoint')) return 'ppt';
+  
+  return 'file';
+}
 </script>
 
 <template>
@@ -22,43 +44,170 @@ defineProps({
       :src="thumbnail"
       :width="size"
       :height="size"
-      alt="Image"
+      alt="Image thumbnail"
       loading="lazy"
+      class="thumbnail-img"
     />
     <svg
       v-else
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 384 512"
+      viewBox="0 0 48 48"
       :width="size"
       :height="size"
+      :class="'icon-' + getFileCategory(contentType)"
     >
-      <!--! Font Awesome Pro 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2022 Fonticons, Inc. -->
-      <path
-        v-if="
-          [
-            'application/gzip',
-            'application/vnd.rar',
-            'application/zip',
-          ].includes(contentType)
-        "
-        d="M365.3 93.38l-74.63-74.64C278.6 6.742 262.3 0 245.4 0L64-.0001c-35.35 0-64 28.65-64 64l.0065 384c0 35.34 28.65 64 64 64H320c35.2 0 64-28.8 64-64V138.6C384 121.7 377.3 105.4 365.3 93.38zM336 448c0 8.836-7.164 16-16 16H64.02c-8.838 0-16-7.164-16-16L48 64.13c0-8.836 7.164-16 16-16h48V64h64V48.13h48.01L224 128c0 17.67 14.33 32 32 32h79.1V448zM176 96h-64v32h64V96zM176 160h-64v32h64V160zM176 224h-64l-30.56 116.5C73.51 379.5 103.7 416 144.3 416c40.26 0 70.45-36.3 62.68-75.15L176 224zM160 368H128c-8.836 0-16-7.164-16-16s7.164-16 16-16h32c8.836 0 16 7.164 16 16S168.8 368 160 368z"
-      />
-      <path
-        v-else-if="contentType === 'application/pdf'"
-        d="M320 464C328.8 464 336 456.8 336 448V416H384V448C384 483.3 355.3 512 320 512H64C28.65 512 0 483.3 0 448V416H48V448C48 456.8 55.16 464 64 464H320zM256 160C238.3 160 224 145.7 224 128V48H64C55.16 48 48 55.16 48 64V192H0V64C0 28.65 28.65 0 64 0H229.5C246.5 0 262.7 6.743 274.7 18.75L365.3 109.3C377.3 121.3 384 137.5 384 154.5V192H336V160H256zM88 224C118.9 224 144 249.1 144 280C144 310.9 118.9 336 88 336H80V368C80 376.8 72.84 384 64 384C55.16 384 48 376.8 48 368V240C48 231.2 55.16 224 64 224H88zM112 280C112 266.7 101.3 256 88 256H80V304H88C101.3 304 112 293.3 112 280zM160 240C160 231.2 167.2 224 176 224H200C226.5 224 248 245.5 248 272V336C248 362.5 226.5 384 200 384H176C167.2 384 160 376.8 160 368V240zM192 352H200C208.8 352 216 344.8 216 336V272C216 263.2 208.8 256 200 256H192V352zM336 224C344.8 224 352 231.2 352 240C352 248.8 344.8 256 336 256H304V288H336C344.8 288 352 295.2 352 304C352 312.8 344.8 320 336 320H304V368C304 376.8 296.8 384 288 384C279.2 384 272 376.8 272 368V240C272 231.2 279.2 224 288 224H336z"
-      />
-      <path
-        v-else-if="contentType.startsWith('video/')"
-        d="M365.3 93.38l-74.63-74.64C278.6 6.742 262.3 0 245.4 0H64C28.65 0 0 28.65 0 64l.0065 384c0 35.34 28.65 64 64 64H320c35.2 0 64-28.8 64-64V138.6C384 121.7 377.3 105.4 365.3 93.38zM336 448c0 8.836-7.164 16-16 16H64.02c-8.838 0-16-7.164-16-16L48 64.13c0-8.836 7.164-16 16-16h160L224 128c0 17.67 14.33 32 32 32h79.1V448zM240 288c0-17.67-14.33-32-32-32h-96c-17.67 0-32 14.33-32 32v96c0 17.67 14.33 32 32 32h96c17.67 0 32-14.33 32-32v-16.52l43.84 30.2C292.3 403.5 304 397.6 304 387.4V284.6c0-10.16-11.64-16.16-20.16-10.32L240 304.5V288z"
-      />
-      <path
-        v-else-if="contentType.startsWith('audio/')"
-        d="M365.3 93.38l-74.63-74.64C278.6 6.742 262.3 0 245.4 0L64-.0001c-35.35 0-64 28.65-64 64l.0065 384c0 35.34 28.65 64 64 64H320c35.2 0 64-28.8 64-64V138.6C384 121.7 377.3 105.4 365.3 93.38zM336 448c0 8.836-7.164 16-16 16H64.02c-8.838 0-16-7.164-16-16L48 64.13c0-8.836 7.164-16 16-16h160L224 128c0 17.67 14.33 32 32 32h79.1V448zM171.5 259.5L136 296H92C85.38 296 80 301.4 80 308v56C80 370.7 85.38 376 92 376H136l35.5 36.5C179.1 420 192 414.8 192 404v-136C192 257.3 179.1 251.9 171.5 259.5zM235.1 260.7c-6.25 6.25-6.25 16.38 0 22.62C235.3 283.5 256 305.1 256 336c0 30.94-20.77 52.53-20.91 52.69c-6.25 6.25-6.25 16.38 0 22.62C238.2 414.4 242.3 416 246.4 416s8.188-1.562 11.31-4.688C258.1 410.1 288 380.5 288 336s-29.05-74.06-30.28-75.31C251.5 254.4 241.3 254.4 235.1 260.7z"
-      />
-      <path
-        v-else
-        d="M0 64C0 28.65 28.65 0 64 0H229.5C246.5 0 262.7 6.743 274.7 18.75L365.3 109.3C377.3 121.3 384 137.5 384 154.5V448C384 483.3 355.3 512 320 512H64C28.65 512 0 483.3 0 448V64zM336 448V160H256C238.3 160 224 145.7 224 128V48H64C55.16 48 48 55.16 48 64V448C48 456.8 55.16 464 64 464H320C328.8 464 336 456.8 336 448z"
-      />
+      <!-- Folder Icon -->
+      <template v-if="getFileCategory(contentType) === 'folder'">
+        <path fill="#FFA726" d="M40 12H22l-4-4H8c-2.2 0-4 1.8-4 4v24c0 2.2 1.8 4 4 4h32c2.2 0 4-1.8 4-4V16c0-2.2-1.8-4-4-4z"/>
+        <path fill="#FFB74D" d="M38 14H20l-2-2H8c-1.1 0-2 .9-2 2v24c0 1.1.9 2 2 2h32c1.1 0 2-.9 2-2V16c0-1.1-.9-2-2-2z"/>
+      </template>
+
+      <!-- Image Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'image'">
+        <rect fill="#42A5F5" x="6" y="10" width="36" height="28" rx="3"/>
+        <circle fill="#FFF59D" cx="16" cy="18" r="4"/>
+        <path fill="#81C784" d="M42 32l-10-10-18 18V38h28V32z"/>
+        <path fill="#A5D6A7" d="M42 32l-6-6-4 4 10 10V32z"/>
+      </template>
+
+      <!-- Video Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'video'">
+        <rect fill="#7E57C2" x="6" y="8" width="36" height="32" rx="3"/>
+        <path fill="#B39DDB" d="M42 12H6c-1.1 0-2 .9-2 2v24c0 1.1.9 2 2 2h36c1.1 0 2-.9 2-2V14c0-1.1-.9-2-2-2z"/>
+        <polygon fill="#FFF" points="20,14 34,24 20,34"/>
+      </template>
+
+      <!-- Audio Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'audio'">
+        <rect fill="#26A69A" x="8" y="6" width="32" height="36" rx="3"/>
+        <circle fill="#80CBC4" cx="24" cy="26" r="10"/>
+        <circle fill="#26A69A" cx="24" cy="26" r="4"/>
+        <rect fill="#80CBC4" x="20" y="10" width="8" height="8"/>
+      </template>
+
+      <!-- PDF Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'pdf'">
+        <path fill="#F44336" d="M48 10L32 6v6H20v6h12v6H20v12h12v6L48 34V10z"/>
+        <text x="24" y="36" fill="#FFF" font-size="14" font-weight="bold" text-anchor="middle">PDF</text>
+      </template>
+
+      <!-- Archive Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'archive'">
+        <rect fill="#FFA726" x="8" y="6" width="32" height="36" rx="2"/>
+        <rect fill="#FFB74D" x="12" y="2" width="24" height="8" rx="2"/>
+        <rect fill="#8D6E63" x="20" y="16" width="8" height="20"/>
+        <circle fill="#795548" cx="24" cy="12" r="4"/>
+      </template>
+
+      <!-- Text File Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'text'">
+        <path fill="#90A4AE" d="M38 4H14c-2.2 0-4 1.8-4 4v32c0 2.2 1.8 4 4 4h28c2.2 0 4-1.8 4-4V12L38 4z"/>
+        <path fill="#B0BEC5" d="M38 4v8h8l-8-8z"/>
+        <rect fill="#ECEFF1" x="14" y="18" width="20" height="2"/>
+        <rect fill="#ECEFF1" x="14" y="24" width="16" height="2"/>
+        <rect fill="#ECEFF1" x="14" y="30" width="18" height="2"/>
+        <rect fill="#ECEFF1" x="14" y="36" width="12" height="2"/>
+      </template>
+
+      <!-- Code File Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'code'">
+        <path fill="#37474F" d="M38 4H14c-2.2 0-4 1.8-4 4v32c0 2.2 1.8 4 4 4h28c2.2 0 4-1.8 4-4V12L38 4z"/>
+        <path fill="#546E7A" d="M38 4v8h8l-8-8z"/>
+        <path fill="#81D4FA" d="M18 20l-6 6 6 6 2-2-4-4 4-4z"/>
+        <path fill="#80CBC4" d="M30 20l6 6-6 6-2-2 4-4-4-4z"/>
+        <path fill="#FFF59D" d="M26 30l-2 2 2 2 2-2z"/>
+      </template>
+
+      <!-- Word Document Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'word'">
+        <path fill="#2196F3" d="M46 8H26v6h12v6H14v24h24V26h8V8z"/>
+        <path fill="#1976D2" d="M24 8H10v6h6v24h8V14h6V8z"/>
+        <path fill="#64B5F6" d="M32 22H18v-6h14v6z"/>
+      </template>
+
+      <!-- Excel Spreadsheet Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'excel'">
+        <path fill="#4CAF50" d="M46 8H26v6h12v6H14v24h24V26h8V8z"/>
+        <path fill="#388E3C" d="M24 8H10v6h6v24h8V14h6V8z"/>
+        <path fill="#81C784" d="M32 22H18v-6h14v6zm0 10H18v-6h14v6z"/>
+      </template>
+
+      <!-- PPT Presentation Icon -->
+      <template v-else-if="getFileCategory(contentType) === 'ppt'">
+        <path fill="#FF5722" d="M46 8H26v6h12v6H14v24h24V26h8V8z"/>
+        <path fill="#E64A19" d="M24 8H10v6h6v24h8V14h6V8z"/>
+        <rect fill="#FFAB91" x="16" y="20" width="20" height="3"/>
+        <rect fill="#FFAB91" x="16" y="26" width="14" height="3"/>
+        <rect fill="#FFAB91" x="16" y="32" width="8" height="3"/>
+      </template>
+
+      <!-- Default File Icon -->
+      <template v-else>
+        <path fill="#78909C" d="M38 4H14c-2.2 0-4 1.8-4 4v32c0 2.2 1.8 4 4 4h24c2.2 0 4-1.8 4-4V12L38 4z"/>
+        <path fill="#90A4AE" d="M38 4v8h8l-8-8z"/>
+        <path fill="#B0BEC5" d="M38 4H14c-2.2 0-4 1.8-4 4v32c0 2.2 1.8 4 4 4h24c2.2 0 4-1.8 4-4V12L38 4z"/>
+      </template>
     </svg>
   </div>
 </template>
+
+<style scoped>
+.file-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.file-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.thumbnail-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.icon-folder svg {
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+
+.icon-image svg {
+  filter: drop-shadow(0 1px 2px rgba(66,165,245,0.4));
+}
+
+.icon-video svg {
+  filter: drop-shadow(0 1px 2px rgba(126,87,194,0.4));
+}
+
+.icon-pdf svg {
+  filter: drop-shadow(0 1px 2px rgba(244,67,54,0.4));
+}
+
+.icon-code svg {
+  filter: drop-shadow(0 1px 2px rgba(55,71,79,0.4));
+}
+
+.icon-word svg {
+  filter: drop-shadow(0 1px 2px rgba(33,150,243,0.4));
+}
+
+.icon-excel svg {
+  filter: drop-shadow(0 1px 2px rgba(76,175,80,0.4));
+}
+
+.icon-ppt svg {
+  filter: drop-shadow(0 1px 2px rgba(255,87,34,0.4));
+}
+
+.icon-archive svg {
+  filter: drop-shadow(0 1px 2px rgba(255,167,38,0.4));
+}
+</style>
