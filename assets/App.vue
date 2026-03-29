@@ -269,7 +269,7 @@ export default {
       const res = await this.authFetch(uploadUrl, {
         method: 'PUT',
         body: '',
-        headers: { "x-amz-copy-source": encodeURIComponent(source) }
+        headers: { "x-amz-copy-source": encodeURIComponent(source), "x-requested-with": "XMLHttpRequest" }
       });
       if (res.status === 401) {
         this.authHeader = null;
@@ -286,7 +286,8 @@ export default {
         const uploadUrl = `/api/write/items/${this.cwd}${folderName}/_$folder$`;
         const res = await this.authFetch(uploadUrl, {
           method: 'PUT',
-          body: ''
+          body: '',
+          headers: { "x-requested-with": "XMLHttpRequest" }
         });
         if (res.status === 401) {
           this.authHeader = null;
@@ -419,7 +420,7 @@ export default {
             const res = await this.authFetch(thumbnailUploadUrl, {
               method: 'PUT',
               body: thumbnailBlob,
-              headers: { 'Content-Type': 'image/png' }
+              headers: { 'Content-Type': 'image/png', 'x-requested-with': 'XMLHttpRequest' }
             });
             if (res.status === 401) {
               this.authHeader = null;
@@ -438,7 +439,7 @@ export default {
 
       try {
         const uploadUrl = `/api/write/items/${basedir}${file.name}`;
-        const headers = { ...this.getAuthHeaders() };
+        const headers = { ...this.getAuthHeaders(), 'x-requested-with': 'XMLHttpRequest' };
         if (thumbnailDigest) headers["fd-thumbnail"] = thumbnailDigest;
         headers['Content-Type'] = file.type;
         
@@ -701,7 +702,7 @@ export default {
     },
 
     async multipartUpload(key, file, options) {
-      const headers = { ...options?.headers };
+      const headers = { ...options?.headers, 'x-requested-with': 'XMLHttpRequest' };
       headers["content-type"] = file.type;
 
       const uploadIdRes = await this.authFetch(`/api/write/items/${key}?uploads`, {
@@ -710,20 +711,20 @@ export default {
         headers
       });
       const { uploadId } = await uploadIdRes.json();
-      
+
       const totalChunks = Math.ceil(file.size / 100 / 1000 / 1000);
       const uploadedParts = [];
 
       for (let i = 1; i <= totalChunks; i++) {
         const chunk = file.slice((i - 1) * 100 * 1000 * 1000, i * 100 * 1000 * 1000);
         const searchParams = new URLSearchParams({ partNumber: i, uploadId });
-        
+
         const partRes = await this.authFetch(`/api/write/items/${key}?${searchParams}`, {
           method: 'PUT',
           body: chunk,
-          headers: { 'Content-Type': file.type }
+          headers: { 'Content-Type': file.type, 'x-requested-with': 'XMLHttpRequest' }
         });
-        
+
         const etag = partRes.headers.get('etag') || `"${i}"`;
         uploadedParts[i - 1] = { partNumber: i, etag };
 
@@ -738,7 +739,7 @@ export default {
       const completeParams = new URLSearchParams({ uploadId });
       await this.authFetch(`/api/write/items/${key}?${completeParams}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-requested-with': 'XMLHttpRequest' },
         body: JSON.stringify({ parts: uploadedParts })
       });
     },
