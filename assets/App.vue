@@ -138,6 +138,11 @@
             <span>移动</span>
           </button>
         </li>
+        <li v-if="clipboard">
+          <button @click="pasteHere">
+            <span>粘贴</span>
+          </button>
+        </li>
         <li>
           <button
             style="color: red"
@@ -154,13 +159,18 @@
           </button>
         </li>
         <li>
-          <a :href="`/raw/${focusedItem.key}`" target="_blank" download>
+          <a :href="`/raw/${focusedItem.key}`" target="_blank" download @click="showContextMenu = false">
             <span>下载</span>
           </a>
         </li>
         <li>
           <button @click="copyFile(focusedItem.key)">
             <span>复制</span>
+          </button>
+        </li>
+        <li v-if="clipboard">
+          <button @click="pasteHere">
+            <span>粘贴</span>
           </button>
         </li>
         <li>
@@ -237,11 +247,13 @@ export default {
     copyLink(link) {
       const url = new URL(link, window.location.origin);
       navigator.clipboard.writeText(url.toString());
+      this.showContextMenu = false;
       this.showMessage('链接已复制到剪贴板', 'success');
     },
 
     copyFile(key) {
       this.clipboard = key;
+      this.showContextMenu = false;
       this.showMessage('文件已复制到剪贴板', 'success');
     },
 
@@ -397,11 +409,40 @@ export default {
     },
 
     async pasteFile() {
-      if (!this.clipboard) return;
+      if (!this.clipboard) {
+        this.showMessage('请先复制文件', 'warning');
+        return;
+      }
       let newName = window.prompt("Rename to:");
       if (newName === null) return;
       if (newName === "") newName = this.clipboard.split("/").pop();
       await this.copyPaste(this.clipboard, `${this.cwd}${newName}`);
+      this.showContextMenu = false;
+      this.showMessage('文件已粘贴', 'success');
+      this.fetchFiles();
+    },
+
+    async pasteHere() {
+      if (!this.clipboard) {
+        this.showMessage('请先复制文件', 'warning');
+        return;
+      }
+      let targetPath;
+      if (typeof this.focusedItem === 'string') {
+        // Folder - paste inside this folder
+        targetPath = this.focusedItem;
+      } else {
+        // File - paste into parent directory
+        const filePath = this.focusedItem.key;
+        targetPath = filePath.substring(0, filePath.lastIndexOf('/') + 1);
+      }
+      // Ensure targetPath ends with /
+      if (!targetPath.endsWith('/')) targetPath += '/';
+      // Get the filename from clipboard
+      const fileName = this.clipboard.split('/').pop();
+      await this.copyPaste(this.clipboard, `${targetPath}${fileName}`);
+      this.showContextMenu = false;
+      this.showMessage('文件已粘贴', 'success');
       this.fetchFiles();
     },
 
@@ -502,6 +543,7 @@ export default {
             : '删除成功';
           console.log(successMessage);
           this.showMessage(successMessage, 'success');
+          this.showContextMenu = false;
           this.fetchFiles();
         } else if (response.status === 401) {
           this.authHeader = null;
@@ -526,6 +568,7 @@ export default {
       if (!newName) return;
       await this.copyPaste(key, `${this.cwd}${newName}`);
       await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
+      this.showContextMenu = false;
       this.fetchFiles();
     },
 
@@ -634,6 +677,7 @@ export default {
         
         // 刷新文件列表
         this.fetchFiles();
+        this.showContextMenu = false;
       } catch (error) {
         console.error('移动失败:', error);
         alert('移动失败,请检查目标路径是否正确');
