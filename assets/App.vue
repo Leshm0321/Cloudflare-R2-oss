@@ -159,9 +159,9 @@
           </button>
         </li>
         <li>
-          <a :href="`/raw/${encodeURIComponent(focusedItem.key)}`" target="_blank" @click="showContextMenu = false">
+          <button @click="downloadFile(focusedItem.key)">
             <span>下载</span>
-          </a>
+          </button>
         </li>
         <li>
           <button @click="copyFile(focusedItem.key)">
@@ -570,6 +570,48 @@ export default {
       await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
       this.showContextMenu = false;
       this.fetchFiles();
+    },
+
+    async downloadFile(key) {
+      try {
+        this.showContextMenu = false;
+        
+        // 使用authFetch获取文件（携带认证信息）
+        const response = await this.authFetch(`/raw/${encodeURIComponent(key)}`);
+        
+        if (response.status === 401) {
+          this.authHeader = null;
+          window.location.href = '/api/write/';
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error('Download failed');
+        }
+        
+        // 获取文件blob
+        const blob = await response.blob();
+        
+        // 从URL获取文件名
+        const filename = key.split('/').pop();
+        
+        // 创建临时下载链接
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // 清理
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        this.showMessage('下载成功', 'success');
+      } catch (error) {
+        console.error('下载失败:', error);
+        this.showMessage('下载失败，请重试', 'error');
+      }
     },
 
     async moveFile(key) {

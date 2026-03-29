@@ -24,16 +24,36 @@ export async function onRequestGet(context) {
     if (object.httpMetadata) {
       if (object.httpMetadata.contentType) {
         let contentType = object.httpMetadata.contentType;
-        // Add charset for text/* types to ensure proper encoding for Chinese characters
-        if (contentType.startsWith('text/') && !contentType.includes('charset')) {
-          contentType += '; charset=utf-8';
+        // Add charset for text-based types to ensure proper encoding for Chinese characters
+        // Only add charset if not already present in the Content-Type header
+        if (!contentType.includes('charset')) {
+          // List of MIME types that may contain text content and need charset
+          const textBasedTypes = [
+            'text/',
+            'application/json',
+            'application/javascript',
+            'application/xml',
+            'application/xhtml+xml',
+            'application/x-javascript',
+            'application/typescript',
+            'application/x-typescript',
+            'application/markdown',
+          ];
+          // Check if the content type starts with any of the text-based types
+          const needsCharset = textBasedTypes.some(type => contentType.startsWith(type));
+          if (needsCharset) {
+            contentType += '; charset=utf-8';
+          }
         }
         headers.set("Content-Type", contentType);
       }
-      if (object.httpMetadata.contentDisposition) {
-        headers.set("Content-Disposition", object.httpMetadata.contentDisposition);
-      }
     }
+
+    // Set Content-Disposition with RFC 5987 encoding for Chinese filenames
+    // This ensures proper filename display in downloads, especially for non-ASCII characters
+    const filename = path.split('/').pop() || 'download';
+    const encodedFilename = encodeURIComponent(filename);
+    headers.set("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodedFilename}`);
 
     // 缩略图长期缓存
     if (path.startsWith("_$flaredrive$/thumbnails/")) {
