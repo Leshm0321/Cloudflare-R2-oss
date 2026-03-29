@@ -159,7 +159,7 @@
           </button>
         </li>
         <li>
-          <a :href="`/raw/${focusedItem.key}`" target="_blank" download @click="showContextMenu = false">
+          <a :href="`/raw/${focusedItem.key}`" target="_blank" @click="showContextMenu = false">
             <span>下载</span>
           </a>
         </li>
