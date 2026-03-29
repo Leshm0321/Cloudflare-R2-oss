@@ -28,9 +28,11 @@ const ALLOWED_CONTENT_TYPES = [
   "text/html",
   "text/css",
   "text/javascript",
+  "text/markdown",
   "application/javascript",
   "application/json",
   "application/xml",
+  "application/markdown",
   "application/zip",
   "application/x-zip-compressed",
   "audio/mpeg",
@@ -279,7 +281,12 @@ export async function onRequestPut(context) {
     customMetadata.thumbnail = request.headers.get("fd-thumbnail");
 
   try {
-    const obj = await bucket.put(path, content, { customMetadata });
+    const obj = await bucket.put(path, content, {
+      httpMetadata: {
+        contentType: contentType || undefined,
+      },
+      customMetadata,
+    });
     const { key, size, uploaded } = obj;
     return new Response(JSON.stringify({ key, size, uploaded }), {
       headers: { "Content-Type": "application/json" },

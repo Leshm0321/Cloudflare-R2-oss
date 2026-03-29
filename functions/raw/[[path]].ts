@@ -21,13 +21,28 @@ export async function onRequestGet(context) {
     if (!object) return notFound();
 
     const headers = new Headers();
+
+    const textExtensions = [
+      '.txt', '.md', '.markdown', '.json', '.js', '.jsx', '.ts', '.tsx',
+      '.xml', '.html', '.htm', '.css', '.scss', '.less', '.yaml', '.yml',
+      '.toml', '.ini', '.cfg', '.conf', '.log', '.csv', '.tsv',
+      '.sh', '.bash', '.zsh', '.fish', '.bat', '.cmd', '.ps1',
+      '.py', '.rb', '.php', '.java', '.c', '.cpp', '.h', '.hpp',
+      '.go', '.rs', '.swift', '.kt', '.scala', '.clj', '.cljs',
+      '.sql', '.graphql', '.gql', '.proto', '.avro',
+      '.vue', '.svelte', '.astro',
+      '.env', '.gitignore', '.dockerignore', '.editorconfig',
+      '.htaccess', '.nginx', '.conf',
+    ];
+
+    const filename = path.split('/').pop()?.toLowerCase() || '';
+    const ext = filename.includes('.') ? '.' + filename.split('.').pop() : '';
+    const isTextByExtension = textExtensions.includes(ext);
+
     if (object.httpMetadata) {
       if (object.httpMetadata.contentType) {
         let contentType = object.httpMetadata.contentType;
-        // Add charset for text-based types to ensure proper encoding for Chinese characters
-        // Only add charset if not already present in the Content-Type header
         if (!contentType.includes('charset')) {
-          // List of MIME types that may contain text content and need charset
           const textBasedTypes = [
             'text/',
             'application/json',
@@ -39,14 +54,17 @@ export async function onRequestGet(context) {
             'application/x-typescript',
             'application/markdown',
           ];
-          // Check if the content type starts with any of the text-based types
           const needsCharset = textBasedTypes.some(type => contentType.startsWith(type));
-          if (needsCharset) {
+          if (needsCharset || isTextByExtension) {
             contentType += '; charset=utf-8';
           }
         }
         headers.set("Content-Type", contentType);
+      } else if (isTextByExtension) {
+        headers.set("Content-Type", "text/plain; charset=utf-8");
       }
+    } else if (isTextByExtension) {
+      headers.set("Content-Type", "text/plain; charset=utf-8");
     }
 
     // 缩略图长期缓存
