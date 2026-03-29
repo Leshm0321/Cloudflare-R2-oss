@@ -159,7 +159,7 @@
           </a>
         </li>
         <li>
-          <button @click="clipboard = focusedItem.key">
+          <button @click="copyFile(focusedItem.key)">
             <span>复制</span>
           </button>
         </li>
@@ -237,6 +237,12 @@ export default {
     copyLink(link) {
       const url = new URL(link, window.location.origin);
       navigator.clipboard.writeText(url.toString());
+      this.showMessage('链接已复制到剪贴板', 'success');
+    },
+
+    copyFile(key) {
+      this.clipboard = key;
+      this.showMessage('文件已复制到剪贴板', 'success');
     },
 
     getAuthHeaders() {
@@ -487,7 +493,8 @@ export default {
         }
 
         const response = await this.authFetch(`/api/write/items/${key}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: { 'x-requested-with': 'XMLHttpRequest' }
         });
         if (response.status === 204 || response.ok) {
           const successMessage = key.endsWith('_$folder$')
@@ -518,7 +525,7 @@ export default {
       const newName = window.prompt("重命名为:");
       if (!newName) return;
       await this.copyPaste(key, `${this.cwd}${newName}`);
-      await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
+      await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
       this.fetchFiles();
     },
 
@@ -601,7 +608,7 @@ export default {
               // 复制到新位置
               await this.copyPaste(item.key, newPath);
               // 删除原位置
-              await this.authFetch(`/api/write/items/${item.key}`, { method: 'DELETE' });
+              await this.authFetch(`/api/write/items/${item.key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
               
               // 更新进度
               processedItems++;
@@ -614,7 +621,7 @@ export default {
           // 移动目录标记
           const targetFolderPath = targetBasePath.slice(0, -1) + '_$folder$';
           await this.copyPaste(key, targetFolderPath);
-          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
+          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
           
           // 清除进度
           this.uploadProgress = null;
@@ -622,7 +629,7 @@ export default {
           // 单文件移动逻辑，修复根目录的情况
           const targetFilePath = normalizedPath + finalFileName;
           await this.copyPaste(key, targetFilePath);
-          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE' });
+          await this.authFetch(`/api/write/items/${key}`, { method: 'DELETE', headers: { 'x-requested-with': 'XMLHttpRequest' } });
         }
         
         // 刷新文件列表
