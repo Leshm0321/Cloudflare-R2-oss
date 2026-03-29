@@ -49,12 +49,6 @@ export async function onRequestGet(context) {
       }
     }
 
-    // Set Content-Disposition with RFC 5987 encoding for Chinese filenames
-    // This ensures proper filename display in downloads, especially for non-ASCII characters
-    const filename = path.split('/').pop() || 'download';
-    const encodedFilename = encodeURIComponent(filename);
-    headers.set("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodedFilename}`);
-
     // 缩略图长期缓存
     if (path.startsWith("_$flaredrive$/thumbnails/")) {
       headers.set("Cache-Control", "max-age=31536000");
