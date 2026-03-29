@@ -89,7 +89,7 @@
       <li v-for="file in filteredFiles" :key="file.key">
         <div
           class="file-item file-item-row"
-          @click="preview(`/raw/${file.key}`)"
+          @click="preview(`/raw/${encodeURIComponent(file.key)}`)"
           @contextmenu.prevent="showContextMenu = true; focusedItem = file;"
         >
           <MimeIcon
@@ -159,7 +159,7 @@
           </button>
         </li>
         <li>
-          <a :href="`/raw/${focusedItem.key}`" target="_blank" @click="showContextMenu = false">
+          <a :href="`/raw/${encodeURIComponent(focusedItem.key)}`" target="_blank" @click="showContextMenu = false">
             <span>下载</span>
           </a>
         </li>
@@ -179,7 +179,7 @@
           </button>
         </li>
         <li>
-          <button @click="copyLink(`/raw/${focusedItem.key}`)">
+          <button @click="copyLink(`/raw/${encodeURIComponent(focusedItem.key)}`)">
             <span>复制链接</span>
           </button>
         </li>

@@ -23,7 +23,12 @@ export async function onRequestGet(context) {
     const headers = new Headers();
     if (object.httpMetadata) {
       if (object.httpMetadata.contentType) {
-        headers.set("Content-Type", object.httpMetadata.contentType);
+        let contentType = object.httpMetadata.contentType;
+        // Add charset for text/* types to ensure proper encoding for Chinese characters
+        if (contentType.startsWith('text/') && !contentType.includes('charset')) {
+          contentType += '; charset=utf-8';
+        }
+        headers.set("Content-Type", contentType);
       }
       if (object.httpMetadata.contentDisposition) {
         headers.set("Content-Disposition", object.httpMetadata.contentDisposition);
